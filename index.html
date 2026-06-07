@@ -395,25 +395,25 @@ gsap.registerPlugin(ScrollTrigger);
   const S = 4; // block size (each "pixel" is 4×4 on the 64×64 grid)
   ctx.imageSmoothingEnabled = false;
 
-  // Bitmap data: 16×16 grid of on/off pixels for "EC"
-  // Design: stylized monogram with pixel-art flair
+  // Bitmap data: 16×16 grid of on/off pixels for "AI"
+  // Design: stylized pixel-art letterforms
   const bitmap = [
     0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-    0,1,1,1,1,1,0,0,1,1,1,1,1,0,0,0,
-    0,1,0,0,0,0,0,0,1,0,0,0,0,0,0,0,
-    0,1,0,0,0,0,0,0,1,0,0,0,0,0,0,0,
-    0,1,1,1,1,0,0,0,1,0,0,0,0,0,0,0,
-    0,1,0,0,0,0,0,0,1,0,0,0,0,0,0,0,
-    0,1,0,0,0,0,0,0,1,0,0,0,0,0,0,0,
-    0,1,1,1,1,1,0,0,1,1,1,1,1,0,0,0,
+    0,0,0,1,1,1,1,0,0,0,1,1,1,0,0,0,
+    0,0,1,0,0,0,0,0,0,1,0,0,0,1,0,0,
+    0,0,1,0,0,0,0,0,0,1,0,0,0,0,0,0,
+    0,0,0,1,1,1,0,0,0,1,0,0,0,0,0,0,
+    0,0,0,0,0,0,1,0,0,1,0,0,0,0,0,0,
+    0,0,0,0,0,0,1,0,0,1,0,0,0,0,0,0,
+    0,0,1,0,0,0,0,0,0,1,0,0,0,1,0,0,
+    0,0,0,1,1,1,1,0,0,0,1,1,1,0,0,0,
     0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-    0,0,0,0,1,0,0,1,0,0,0,1,0,0,0,0,
-    0,0,0,1,0,1,0,1,0,0,1,0,1,0,0,0,
-    0,0,1,0,0,0,1,0,0,1,0,0,0,1,0,0,
-    0,1,0,0,0,0,0,0,1,0,0,0,0,0,1,0,
-    0,1,0,0,0,0,0,0,1,0,0,0,0,0,1,0,
-    0,1,0,0,0,0,0,0,0,1,0,0,0,1,0,0,
-    0,0,1,1,1,1,1,1,0,0,1,1,1,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,1,0,0,0,0,0,0,0,0,1,0,0,0,
+    0,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,
+    0,0,0,0,0,0,1,1,1,1,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   ];
 
   // Colors
@@ -423,22 +423,37 @@ gsap.registerPlugin(ScrollTrigger);
   function drawFrame(t) {
     ctx.clearRect(0, 0, 64, 64);
 
+    const elapsed = t * 0.001; // seconds since page load
+    const revealDuration = 2.5; // total seconds for all pixels to appear
+    const totalPixels = bitmap.filter(v => v === 1).length;
+
+    // Collect all active pixel indices for sequential reveal
+    const activeIndices = [];
+    bitmap.forEach((v, i) => { if (v === 1) activeIndices.push(i); });
+
     for (let row = 0; row < 16; row++) {
       for (let col = 0; col < 16; col++) {
         const idx = row * 16 + col;
         const v = bitmap[idx];
         if (v === 0) continue;
 
-        // Pulsing alpha per block
+        // Sequential reveal: each pixel fades in based on its order
+        const orderInActive = activeIndices.indexOf(idx);
+        const revealStart = (orderInActive / totalPixels) * revealDuration;
+        const revealProgress = Math.min(1, Math.max(0, (elapsed - revealStart) / 0.6));
+
+        // Pulsing alpha per block (after revealed)
         const seed = (row * 17 + col * 31) % 100;
-        const pulse = 0.6 + 0.4 * Math.sin(t * 0.003 + seed * 0.1);
-        const alpha = pulse;
+        const pulse = 0.7 + 0.3 * Math.sin(elapsed * 2 + seed * 0.1);
+        const alpha = pulse * revealProgress;
+
+        if (alpha < 0.02) continue;
 
         ctx.fillStyle = `rgba(26,23,20,${alpha})`;
         ctx.fillRect(col * S, row * S, S, S);
 
-        // Glow halo: draw a larger, more transparent rect behind
-        ctx.fillStyle = `rgba(26,23,20,${alpha * 0.15})`;
+        // Glow halo
+        ctx.fillStyle = `rgba(26,23,20,${alpha * 0.12})`;
         ctx.fillRect(col * S - 1, row * S - 1, S + 2, S + 2);
       }
     }
@@ -447,10 +462,10 @@ gsap.registerPlugin(ScrollTrigger);
   gsap.ticker.add(() => drawFrame(performance.now()));
   drawFrame(0);
 
-  // GSAP entrance: scale in from 0
+  // GSAP entrance: scale in from 0 with stagger already handled by drawFrame reveal
   gsap.from(canvas, {
-    scale: 0, duration: 1.2, ease: 'elastic.out(0.8, 0.4)',
-    delay: 0.3
+    scale: 0, duration: 0.8, ease: 'back.out(1.2)',
+    delay: 0.2
   });
 })();
 
