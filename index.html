@@ -23,16 +23,16 @@
   }
 
   :root {
-    --bg: #0a0a0c;
-    --bg-alt: #0f0f14;
-    --surface: #14141c;
-    --text: #e0dcd5;
-    --text-secondary: #8a8680;
-    --text-muted: #4a4640;
-    --accent: #00ff88;
-    --accent-dim: #0d2a1d;
-    --accent2: #ff6b6b;
-    --border: #1e1e2a;
+    --bg: #f5f0e8;
+    --bg-alt: #ede6da;
+    --surface: #faf7f2;
+    --text: #1a1714;
+    --text-secondary: #5c5650;
+    --text-muted: #9c9488;
+    --accent: #1a1714;
+    --accent-dim: #e8e0d4;
+    --accent2: #5c5650;
+    --border: #d4cbc0;
     --radius: 0px;
     --max-width: 1100px;
     --pixel-size: 4px;
@@ -52,10 +52,10 @@
 
   /* ── Grid overlay ── */
   .grid-bg {
-    position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: 0.04;
+    position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: 0.06;
     background-image:
-      linear-gradient(rgba(0,255,136,0.3) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(0,255,136,0.3) 1px, transparent 1px);
+      linear-gradient(rgba(0,0,0,0.15) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,0,0,0.15) 1px, transparent 1px);
     background-size: 20px 20px;
   }
 
@@ -79,7 +79,7 @@
   /* ── Navigation ── */
   nav {
     position: fixed; top: 0; left: 0; right: 0; z-index: 100;
-    background: rgba(10,10,12,0.9); border-bottom: 2px solid var(--accent);
+    background: rgba(245,240,232,0.92); border-bottom: 2px solid var(--border);
     image-rendering: pixelated;
   }
   .nav-inner {
@@ -127,7 +127,7 @@
     background: transparent; cursor: pointer;
     transition: background 0.15s; image-rendering: pixelated;
   }
-  .hero-cta:hover { background: rgba(0,255,136,0.1); }
+  .hero-cta:hover { background: rgba(0,0,0,0.04); }
 
   /* ── Sections ── */
   section { padding: 5rem 0; position: relative; z-index: 1; }
@@ -206,11 +206,11 @@
     color: var(--accent); font-family: 'Press Start 2P', monospace; font-size: 0.5rem;
     cursor: pointer; width: fit-content; image-rendering: pixelated;
   }
-  .contact-form button:hover { background: rgba(0,255,136,0.1); }
+  .contact-form button:hover { background: rgba(0,0,0,0.04); }
 
   /* ── Footer ── */
   footer {
-    padding: 2.5rem 0; border-top: 2px solid var(--accent);
+    padding: 2.5rem 0; border-top: 2px solid var(--border);
     color: var(--text-muted); font-size: 0.7rem; font-family: 'Press Start 2P', monospace;
     position: relative; z-index: 1; text-align: center;
   }
@@ -219,7 +219,7 @@
   /* ── Scanline effect ── */
   .scanlines {
     position: fixed; inset: 0; z-index: 999; pointer-events: none; opacity: 0.03;
-    background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.5) 2px, rgba(0,0,0,0.5) 4px);
+    background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.03) 2px, rgba(0,0,0,0.03) 4px);
   }
 
   @media (max-width: 768px) {
@@ -417,8 +417,8 @@ gsap.registerPlugin(ScrollTrigger);
   ];
 
   // Colors
-  const COLOR_ON  = '#00ff88';
-  const COLOR_OFF = '#0a0a0c';
+  const COLOR_ON  = '#1a1714';
+  const COLOR_OFF = '#f5f0e8';
 
   function drawFrame(t) {
     ctx.clearRect(0, 0, 64, 64);
@@ -434,11 +434,11 @@ gsap.registerPlugin(ScrollTrigger);
         const pulse = 0.6 + 0.4 * Math.sin(t * 0.003 + seed * 0.1);
         const alpha = pulse;
 
-        ctx.fillStyle = `rgba(0,255,136,${alpha})`;
+        ctx.fillStyle = `rgba(26,23,20,${alpha})`;
         ctx.fillRect(col * S, row * S, S, S);
 
         // Glow halo: draw a larger, more transparent rect behind
-        ctx.fillStyle = `rgba(0,255,136,${alpha * 0.2})`;
+        ctx.fillStyle = `rgba(26,23,20,${alpha * 0.15})`;
         ctx.fillRect(col * S - 1, row * S - 1, S + 2, S + 2);
       }
     }
@@ -493,7 +493,7 @@ function createNeuralNet(canvasId) {
         const dist = Math.hypot(dx, dy);
         if (dist < 120) {
           ctx.beginPath(); ctx.moveTo(nodes[i].x, nodes[i].y); ctx.lineTo(nodes[j].x, nodes[j].y);
-          ctx.strokeStyle = `rgba(0,255,136,${0.12 * (1 - dist/120)})`; ctx.lineWidth = 1; ctx.stroke();
+          ctx.strokeStyle = `rgba(26,23,20,${0.08 * (1 - dist/120)})`; ctx.lineWidth = 1; ctx.stroke();
         }
       }
     }
@@ -503,7 +503,7 @@ function createNeuralNet(canvasId) {
       if (n.x < 0 || n.x > canvas.width) n.vx *= -1;
       if (n.y < 0 || n.y > canvas.height) n.vy *= -1;
       const a = 0.3 + Math.sin(n.pulse) * 0.15;
-      ctx.fillStyle = `rgba(0,255,136,${Math.max(0.1, a)})`;
+      ctx.fillStyle = `rgba(26,23,20,${Math.max(0.1, a)})`;
       ctx.fillRect(Math.round(n.x - n.r/2), Math.round(n.y - n.r/2), n.r, n.r);
     });
     requestAnimationFrame(draw);
@@ -542,7 +542,7 @@ document.querySelectorAll('.port-canvas').forEach(c => {
         const dist = Math.hypot(dx, dy);
         if (dist < 80) {
           ctx2.beginPath(); ctx2.moveTo(nodes2[i].x, nodes2[i].y); ctx2.lineTo(nodes2[j].x, nodes2[j].y);
-          ctx2.strokeStyle = `rgba(0,255,136,${0.1 * (1 - dist/80)})`; ctx2.lineWidth = 1; ctx2.stroke();
+          ctx2.strokeStyle = `rgba(26,23,20,${0.06 * (1 - dist/80)})`; ctx2.lineWidth = 1; ctx2.stroke();
         }
       }
     }
@@ -550,7 +550,7 @@ document.querySelectorAll('.port-canvas').forEach(c => {
       n.x += n.vx; n.y += n.vy;
       if (n.x < 2 || n.x > (c.width - 2)) n.vx *= -1;
       if (n.y < 2 || n.y > (c.height - 2)) n.vy *= -1;
-      ctx2.fillStyle = 'rgba(0,255,136,0.4)';
+      ctx2.fillStyle = 'rgba(26,23,20,0.25)';
       ctx2.fillRect(Math.round(n.x - 1), Math.round(n.y - 1), 2, 2);
     });
     requestAnimationFrame(draw2);
