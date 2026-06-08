@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>A.I. Artificial Intelligence - Pixel Artboard</title>
+    <!-- Tailwind CSS 用於現代感排版與佈局 -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 載入 Google 字型提升排版質感 -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&family=Playfair+Display:ital,wght@0,700;1,400&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #020204;
+            color: #f1f5f9;
+            overflow: hidden;
+            height: 100vh;
+        }
+        .serif-text {
+            font-family: 'Playfair Display', serif;
+        }
+        /* 科技藍背光柔和霓虹效果 */
+        .neon-glow {
+            box-shadow: 0 0 40px rgba(147, 197, 253, 0.12), inset 0 0 20px rgba(147, 197, 253, 0.03);
+        }
+        /* 復古 CRT 電視掃描線遮罩，增加數位點陣質感 */
+        .crt-overlay::after {
+            content: " ";
+            display: block;
+            position: absolute;
+            top: 0; left: 0; bottom: 0; right: 0;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.2) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.03), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.03));
+            background-size: 100% 4px, 6px 100%;
+            z-index: 10;
+            pointer-events: none;
+            opacity: 0.65;
+        }
+    </style>
+</head>
+<body class="flex flex-col justify-between p-6 md:p-10 min-h-screen">
+
+    <!-- 頂部：極簡藝術館標題 -->
+    <header class="flex justify-between items-center z-20">
+        <div>
+            <p class="text-[10px] tracking-[0.4em] text-blue-400 font-bold uppercase">DIGITAL EXHIBITION</p>
+            <h1 class="text-sm font-semibold tracking-wider text-gray-400 mt-1">A.I. 32-bit 圓角鋼鐵灰粒子藝術</h1>
+        </div>
+        <div class="text-[10px] text-gray-600 font-mono tracking-widest hidden sm:block">
+            SYSTEM PRESET: ACTIVE
+        </div>
+    </header>
+
+    <!-- 中間：藝術呈現主體 -->
+    <main class="flex-grow flex flex-col items-center justify-center my-4 z-20">
+        <div class="relative w-full aspect-[4/3] max-w-[680px] bg-black/90 border border-gray-900/60 rounded-3xl overflow-hidden neon-glow crt-overlay flex items-center justify-center p-0" id="canvas-container">
+            <!-- 互動繪圖 Canvas -->
+            <canvas id="pixel-canvas" class="w-full h-full block cursor-crosshair z-20"></canvas>
+            
+            <!-- 藝術家水印與註解 -->
+            <div class="absolute bottom-4 left-6 text-[9px] tracking-[0.2em] text-gray-700 font-mono select-none z-30">
+                STEVEN SPIELBERG FILM (2001) // GESTALT REVERSAL 
+            </div>
+            
+            <!-- 即時懸停提示 -->
+            <div class="absolute top-4 right-6 text-[9px] tracking-[0.1em] text-gray-500 font-mono select-none z-30 flex items-center space-x-1.5">
+                <span class="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></span>
+                <span>滑鼠懸停以展開重力斥力 (75px)</span>
+            </div>
+        </div>
+
+        <!-- 解構/重組控制按鈕 -->
+        <div class="mt-6 flex space-x-4">
+            <button onclick="toggleDeconstruct()" class="px-6 py-2.5 rounded-full bg-blue-600/10 hover:bg-blue-600/20 border border-blue-500/20 hover:border-blue-500/40 text-blue-300 font-medium text-xs tracking-wider transition-all duration-300 active:scale-95 flex items-center space-x-2">
+                <svg class="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24">
+                    <path d="M12 22C6.477 22 2 17.523 2 12S6.477 2 12 2s10 4.477 10 10-4.477 10-10 10zm-1-11H7v2h4v4h2v-4h4v-2h-4V7h-2v4z"/>
+                </svg>
+                <span id="btn-text">解構 A.I. 空間幾何</span>
+            </button>
+            <button onclick="triggerAssembleEffect()" class="px-5 py-2.5 rounded-full bg-gray-950 hover:bg-gray-900 border border-gray-900 hover:border-gray-800 text-gray-400 hover:text-gray-200 text-xs tracking-wider transition-all duration-300">
+                瞬間粒子凝聚
+            </button>
+        </div>
+    </main>
+
+    <!-- 底部：美學引言與介紹 -->
+    <footer class="flex flex-col sm:flex-row justify-between items-center text-xs text-gray-600 gap-4 border-t border-gray-950/80 pt-4 z-20">
+        <p class="max-w-md text-center sm:text-left leading-relaxed">
+            這幅作品精確復刻了電影《A.I.》中圖地反轉的哲學結構。左側的「A」內部由黑色否定空間雕刻出男孩輪廓，與右側代表「I」的實體粒子交相輝映。
+        </p>
+        <p class="font-mono text-[10px] text-gray-500">
+            32-Bit / Rounded Pixel / Steel Silver / Radius 75
+        </p>
+    </footer>
+
+    <!-- 粒子核心控制 JavaScript -->
+    <script>
+        // --- 1. 固定美學參數設定 ---
+        const settings = {
+            cols: 115,          // 32-bit 高精度像素列數
+            rows: 83,           // 32-bit 高精度像素行數
+            shape: 'rounded',   // 圓角像素
+            palette: 'silver',  // 鋼鐵銀灰
+            forceRadius: 75,    // 75px 重力排斥半徑
+            deconstruct: false  // 初始為正常組合狀態
+        };
+
+        const canvas = document.getElementById('pixel-canvas');
+        const ctx = canvas.getContext('2d');
+        
+        // 建立離屏快照緩衝區 (用於精準讀取向量形狀並降採樣為像素)
+        const offscreen = document.createElement('canvas');
+        const offCtx = offscreen.getContext('2d');
+
+        let particles = [];
+        let canvasWidth = 0;
+        let canvasHeight = 0;
+        let pSize = 10;
+
+        // 滑鼠與觸控物理狀態
+        const mouse = {
+            x: -9999,
+            y: -9999,
+            radius: settings.forceRadius
+        };
+
+        // --- 2. 粒子物理類別 (PixelParticle) ---
+        class PixelParticle {
+            constructor(c, r, targetX, targetY, size, type) {
+                this.col = c;
+                this.row = r;
+                this.ox = targetX;
+                this.oy = targetY;
+                
+                // 動態生成時，粒子會從隨機邊緣飛入，增加科技感的載入效果
+                this.x = targetX + (Math.random() - 0.5) * 100;
+                this.y = targetY + (Math.random() - 0.5) * 100;
+                
+                this.size = size;
+                this.type = type; // 'A', 'neg-boy' (A中鏤空的部分), 'I' (實體男孩), 'dots'
+                
+                this.vx = 0;
+                this.vy = 0;
+                this.friction = 0.85; // 流暢阻尼
+                this.spring = 0.12;   // 物理彈簧剛度
+                this.alpha = 1.0;
+                this.targetAlpha = 1.0;
+            }
+
+            update(deconstructActive) {
+                let targetX = this.ox;
+                let targetY = this.oy;
+                this.targetAlpha = 1.0;
+
+                // 處理解構平移動畫
+                if (deconstructActive) {
+                    if (this.type === 'neg-boy') {
+                        // 否定空間粒子提取，精確滑行到 I 的對應位置
+                        const shiftX = 330 * (canvasWidth / 900);
+                        targetX = this.ox + shiftX;
+                    } else if (this.type === 'I') {
+                        // 實心 I 的粒子在被提取粒子填滿時，降低透明度，以顯示融合效果
+                        this.targetAlpha = 0.15;
+                    }
+                }
+
+                // 滑鼠斥力物理方程式
+                const dx = this.x - mouse.x;
+                const dy = this.y - mouse.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                
+                let forceX = 0;
+                let forceY = 0;
+
+                if (distance < mouse.radius) {
+                    const force = (mouse.radius - distance) / mouse.radius;
+                    const angle = Math.atan2(dy, dx);
+                    // 彈開係數，保持動態靈敏度
+                    forceX = Math.cos(angle) * force * 16;
+                    forceY = Math.sin(angle) * force * 16;
+                }
+
+                // 經典 Verlet / Spring 阻尼積分
+                const ax = (targetX - this.x) * this.spring;
+                const ay = (targetY - this.y) * this.spring;
+
+                this.vx += ax + forceX;
+                this.vy += ay + forceY;
+                this.vx *= this.friction;
+                this.vy *= this.friction;
+
+                this.x += this.vx;
+                this.y += this.vy;
+
+                // 透明度過渡
+                this.alpha += (this.targetAlpha - this.alpha) * 0.1;
+            }
+
+            draw(renderCtx) {
+                let color = '#ffffff';
+                
+                // 銀灰鋼鐵髮絲紋色彩漸變
+                if (this.type === 'neg-boy' && settings.deconstruct) {
+                    color = `rgba(147, 197, 253, ${this.alpha * 0.9})`; // 解構時散發冷光藍
+                } else {
+                    // 利用 X 座標弦函數，調製出金屬折射的光影層次
+                    const colorVal = Math.floor(185 + Math.sin(this.ox * 0.012) * 45);
+                    color = `rgba(${colorVal}, ${colorVal + 8}, ${colorVal + 22}, ${this.alpha})`;
+                }
+
+                renderCtx.fillStyle = color;
+                renderCtx.save();
+                renderCtx.translate(this.x, this.y);
+
+                // 留出 15% 的像素微小間隙，讓粒子輪廓更鮮明精緻
+                const drawSize = this.size * 0.85;
+
+                // 繪製高質感圓角像素 (圓角半徑為大小的 25%)
+                renderCtx.beginPath();
+                renderCtx.roundRect(-drawSize/2, -drawSize/2, drawSize, drawSize, drawSize * 0.25);
+                renderCtx.fill();
+
+                renderCtx.restore();
+            }
+        }
+
+        // --- 3. 離屏黑白像素降採樣重建引擎 ---
+        function buildPixelGrid() {
+            const cols = settings.cols;
+            const rows = settings.rows;
+            
+            offscreen.width = cols;
+            offscreen.height = rows;
+            
+            offCtx.fillStyle = '#000000';
+            offCtx.fillRect(0, 0, cols, rows);
+            
+            // 縮放比例，將 900x650 設計幾何等比映射到離屏小圖上
+            offCtx.save();
+            offCtx.scale(cols / 900, rows / 650);
+            
+            // 男孩剪影 SVG 向量數據
+            const boyPath = new Path2D("M 45,540 C 42,530 40,510 41,490 C 42,460 46,430 48,400 C 50,370 50,340 48,310 C 46,280 41,250 36,220 C 34,210 31,190 32,175 C 33,160 40,150 43,130 C 44,120 41,110 36,100 C 31,90 27,75 29,60 C 31,42 45,25 62,20 C 80,15 96,28 100,45 C 102,55 98,65 101,75 C 104,85 114,92 118,100 C 122,108 118,115 112,120 C 108,123 110,128 113,132 C 116,136 122,140 118,148 C 115,152 108,153 105,158 C 102,163 103,169 101,175 C 98,181 92,188 90,198 C 88,208 89,228 88,248 C 87,278 91,308 93,338 C 95,368 96,398 95,428 C 94,458 91,488 89,518 C 88,530 92,535 100,538 C 108,541 115,541 118,543 C 120,545 115,545 45,540 Z");
+
+            // 繪製 A
+            offCtx.fillStyle = '#FF0000';
+            offCtx.beginPath();
+            offCtx.moveTo(100, 650);
+            offCtx.lineTo(250, 80);
+            offCtx.lineTo(350, 80);
+            offCtx.lineTo(500, 650);
+            offCtx.lineTo(400, 650);
+            offCtx.lineTo(350, 470);
+            offCtx.lineTo(215, 470);
+            offCtx.lineTo(160, 650);
+            offCtx.closePath();
+            offCtx.fill();
+            
+            // 挖去 A 的內部空洞與左三角
+            offCtx.globalCompositeOperation = 'destination-out';
+            offCtx.save();
+            offCtx.translate(250, 100);
+            offCtx.fill(boyPath);
+            offCtx.restore();
+            
+            offCtx.beginPath();
+            offCtx.moveTo(175, 650);
+            offCtx.lineTo(245, 470);
+            offCtx.lineTo(290, 650);
+            offCtx.closePath();
+            offCtx.fill();
+            
+            offCtx.globalCompositeOperation = 'source-over';
+            
+            // 繪製否定空間男孩
+            offCtx.fillStyle = '#00FF00';
+            offCtx.save();
+            offCtx.translate(250, 100);
+            offCtx.fill(boyPath);
+            offCtx.restore();
+            
+            // 繪製 I
+            offCtx.fillStyle = '#0000FF';
+            offCtx.save();
+            offCtx.translate(580, 100);
+            offCtx.fill(boyPath);
+            offCtx.restore();
+            
+            // 繪製兩個經典定位點
+            offCtx.fillStyle = '#FFFF00';
+            offCtx.beginPath();
+            offCtx.arc(545, 625, 23, 0, Math.PI * 2);
+            offCtx.fill();
+            
+            offCtx.beginPath();
+            offCtx.arc(810, 625, 23, 0, Math.PI * 2);
+            offCtx.fill();
+            
+            offCtx.restore();
+
+            // 掃描像素數據並重組為實體粒子
+            const imgData = offCtx.getImageData(0, 0, cols, rows);
+            const data = imgData.data;
+            
+            particles = [];
+            pSize = canvasWidth / cols;
+
+            for (let r = 0; r < rows; r++) {
+                for (let c = 0; c < cols; c++) {
+                    const idx = (r * cols + c) * 4;
+                    const R = data[idx];
+                    const G = data[idx + 1];
+                    const B = data[idx + 2];
+                    const A = data[idx + 3];
+
+                    if (A > 120) {
+                        let type = null;
+                        if (R > 200 && G < 50 && B < 50) {
+                            type = 'A';
+                        } else if (G > 200 && R < 50 && B < 50) {
+                            type = 'neg-boy';
+                        } else if (B > 200 && R < 50 && G < 50) {
+                            type = 'I';
+                        } else if (R > 200 && G > 200 && B < 50) {
+                            type = 'dots';
+                        }
+
+                        if (type) {
+                            const px = c * pSize + pSize / 2;
+                            const py = r * pSize + pSize / 2;
+                            particles.push(new PixelParticle(c, r, px, py, pSize, type));
+                        }
+                    }
+                }
+            }
+        }
+
+        // --- 4. 動畫渲染循環 ---
+        function animate() {
+            ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+
+            // 繪製細微的背景網格點陣
+            ctx.save();
+            ctx.strokeStyle = 'rgba(30, 41, 59, 0.15)';
+            ctx.lineWidth = 0.5;
+            for (let x = 0; x < canvasWidth; x += pSize) {
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, canvasHeight);
+                ctx.stroke();
+            }
+            for (let y = 0; y < canvasHeight; y += pSize) {
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(canvasWidth, y);
+                ctx.stroke();
+            }
+            ctx.restore();
+
+            // 更新並渲染所有激活的粒子
+            for (let i = 0; i < particles.length; i++) {
+                const p = particles[i];
+                p.update(settings.deconstruct);
+                
+                // 如果是正常組合狀態下，不渲染 A 內部的否定空間男孩粒子
+                if (p.type === 'neg-boy' && !settings.deconstruct) {
+                    continue;
+                }
+                
+                p.draw(ctx);
+            }
+
+            requestAnimationFrame(animate);
+        }
+
+        // --- 5. RWD 視窗與畫布等比縮放自適應 ---
+        function resizeCanvas() {
+            const container = document.getElementById('canvas-container');
+            const rect = container.getBoundingClientRect();
+            
+            canvasWidth = rect.width;
+            canvasHeight = rect.width * (650 / 900);
+            
+            canvas.width = canvasWidth;
+            canvas.height = canvasHeight;
+
+            buildPixelGrid();
+        }
+
+        // --- 6. 互動功能函數 ---
+
+        // 解構切換
+        function toggleDeconstruct() {
+            settings.deconstruct = !settings.deconstruct;
+            const btnText = document.getElementById('btn-text');
+            btnText.textContent = settings.deconstruct ? "組合 A.I. 空間幾何" : "解構 A.I. 空間幾何";
+        }
+
+        // 瞬間物理干涉（爆發性散開後流暢凝聚）
+        function triggerAssembleEffect() {
+            particles.forEach(p => {
+                p.x = p.ox + (Math.random() - 0.5) * canvasWidth;
+                p.y = p.oy + (Math.random() - 0.5) * canvasHeight;
+            });
+        }
+
+        // --- 7. 事件監聽設定 ---
+
+        // 捕捉滑鼠在 Canvas 內的精準局部座標
+        canvas.addEventListener('mousemove', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            mouse.x = e.clientX - rect.left;
+            mouse.y = e.clientY - rect.top;
+        });
+
+        // 滑鼠離開後清空干涉
+        canvas.addEventListener('mouseleave', () => {
+            mouse.x = -9999;
+            mouse.y = -9999;
+        });
+
+        // 支援行動端觸控
+        canvas.addEventListener('touchmove', (e) => {
+            if (e.touches.length > 0) {
+                const rect = canvas.getBoundingClientRect();
+                mouse.x = e.touches[0].clientX - rect.left;
+                mouse.y = e.touches[0].clientY - rect.top;
+            }
+        });
+
+        canvas.addEventListener('touchend', () => {
+            mouse.x = -9999;
+            mouse.y = -9999;
+        });
+
+        // 視窗 resize 監聽
+        window.addEventListener('resize', resizeCanvas);
+
+        // 初始化
+        window.onload = function() {
+            resizeCanvas();
+            animate();
+        };
+    </script>
+</body>
+</html>
