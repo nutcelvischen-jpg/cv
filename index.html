@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -105,14 +106,31 @@
     position: relative; z-index: 1;
   }
 
-  /* ── BITMAP LOGO ── */
-  .bitmap-logo {
-    position: relative; margin-bottom: 3rem; image-rendering: pixelated;
+  /* ── PARTICLE A.I. LOGO ── */
+  .ai-particle-wrap {
+    position: relative;
+    width: min(680px, 92vw);
+    margin-bottom: 2.5rem;
   }
-  #bitmap-canvas {
-    display: block; image-rendering: pixelated;
-    max-width: min(320px, 80vw); height: auto;
+  #ai-particle-canvas {
+    display: block;
+    width: 100%;
+    border: 2px solid var(--border);
+    background: transparent;
+    cursor: crosshair;
   }
+  .ai-particle-controls {
+    display: flex; gap: 0.75rem; margin-top: 0.75rem; justify-content: center;
+  }
+  .ai-btn {
+    padding: 0.35rem 0.9rem;
+    border: 2px solid var(--accent); background: transparent;
+    color: var(--accent); font-family: 'Press Start 2P', monospace; font-size: 0.38rem;
+    cursor: pointer; letter-spacing: 0.05em;
+    transition: background 0.15s; image-rendering: pixelated;
+  }
+  .ai-btn:hover { background: rgba(0,0,0,0.06); }
+  .ai-btn:active { transform: scale(0.96); }
 
   /* ── Hero text ── */
   .hero-name { font-family: 'Press Start 2P', monospace; font-size: clamp(0.9rem, 2.5vw, 1.3rem); margin: 1.5rem 0 1rem; color: var(--accent); }
@@ -254,9 +272,13 @@
 
 <!-- Hero -->
 <section class="hero" id="hero">
-  <!-- BITMAP LOGO CANVAS -->
-  <div class="bitmap-logo">
-    <canvas id="bitmap-canvas" width="64" height="64"></canvas>
+  <!-- PARTICLE A.I. CANVAS -->
+  <div class="ai-particle-wrap">
+    <canvas id="ai-particle-canvas"></canvas>
+    <div class="ai-particle-controls">
+      <button class="ai-btn" onclick="toggleDeconstruct()" id="ai-btn-text">DECONSTRUCT()</button>
+      <button class="ai-btn" onclick="triggerAssembleEffect()">SCATTER()</button>
+    </div>
   </div>
 
   <div class="hero-name" id="hero-name">ELVIS CHEN</div>
@@ -385,90 +407,203 @@
 gsap.registerPlugin(ScrollTrigger);
 
 // ══════════════════════════════════════════
-// BITMAP LOGO — 64×64 pixel art w/ GSAP animation
+// A.I. PARTICLE LOGO — gestalt pixel art
 // ══════════════════════════════════════════
 (function() {
-  const canvas = document.getElementById('bitmap-canvas');
-  canvas.width  = 64;
-  canvas.height = 64;
+  const settings = {
+    cols: 115, rows: 83,
+    forceRadius: 70,
+    deconstruct: false
+  };
+
+  const canvas = document.getElementById('ai-particle-canvas');
   const ctx = canvas.getContext('2d');
-  const S = 4; // block size (each "pixel" is 4×4 on the 64×64 grid)
-  ctx.imageSmoothingEnabled = false;
+  const offscreen = document.createElement('canvas');
+  const offCtx = offscreen.getContext('2d');
 
-  // Bitmap data: 16×16 grid — A.I. movie poster icon
-  // Left: 「A」archway with negative-space boy silhouette carved inside
-  // Right: 「I」boy figure (thin vertical column)
-  // Bottom: two registration dots (classic poster motif)
-  // Based on the 115×83 particle art design from /ai
-  const bitmap = [
-    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-    0,0,0,0,0,0,1,1,1,1,0,0,0,0,0,0,
-    0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,
-    0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,
-    0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,
-    0,0,0,1,0,0,1,1,0,0,0,0,0,1,0,0,
-    0,0,1,0,0,1,0,0,0,0,0,0,0,1,0,0,
-    0,0,1,0,0,0,1,1,0,0,0,0,1,0,0,0,
-    0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,
-    0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,
-    0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,
-    0,0,0,1,0,0,0,0,0,0,0,1,0,0,0,0,
-    0,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,
-    0,0,0,0,0,1,1,1,1,0,0,0,0,0,0,0,
-    0,0,0,0,0,0,0,0,0,1,0,0,1,0,0,0,
-    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  ];
+  let particles = [], canvasWidth = 0, canvasHeight = 0, pSize = 10;
+  const mouse = { x: -9999, y: -9999, radius: settings.forceRadius };
 
-  // Colors
-  const COLOR_ON  = '#1a1714';
-  const COLOR_OFF = '#f5f0e8';
-
-  function drawFrame(t) {
-    ctx.clearRect(0, 0, 64, 64);
-
-    const elapsed = t * 0.001; // seconds since page load
-    const revealDuration = 2.5; // total seconds for all pixels to appear
-    const totalPixels = bitmap.filter(v => v === 1).length;
-
-    // Collect all active pixel indices for sequential reveal
-    const activeIndices = [];
-    bitmap.forEach((v, i) => { if (v === 1) activeIndices.push(i); });
-
-    for (let row = 0; row < 16; row++) {
-      for (let col = 0; col < 16; col++) {
-        const idx = row * 16 + col;
-        const v = bitmap[idx];
-        if (v === 0) continue;
-
-        // Sequential reveal: each pixel fades in based on its order
-        const orderInActive = activeIndices.indexOf(idx);
-        const revealStart = (orderInActive / totalPixels) * revealDuration;
-        const revealProgress = Math.min(1, Math.max(0, (elapsed - revealStart) / 0.6));
-
-        // Pulsing alpha per block (after revealed)
-        const seed = (row * 17 + col * 31) % 100;
-        const pulse = 0.7 + 0.3 * Math.sin(elapsed * 2 + seed * 0.1);
-        const alpha = pulse * revealProgress;
-
-        if (alpha < 0.02) continue;
-
-        ctx.fillStyle = `rgba(26,23,20,${alpha})`;
-        ctx.fillRect(col * S, row * S, S, S);
-
-        // Glow halo
-        ctx.fillStyle = `rgba(26,23,20,${alpha * 0.12})`;
-        ctx.fillRect(col * S - 1, row * S - 1, S + 2, S + 2);
+  class PixelParticle {
+    constructor(c, r, targetX, targetY, size, type) {
+      this.col = c; this.row = r;
+      this.ox = targetX; this.oy = targetY;
+      this.x = targetX + (Math.random() - 0.5) * 120;
+      this.y = targetY + (Math.random() - 0.5) * 120;
+      this.size = size; this.type = type;
+      this.vx = 0; this.vy = 0;
+      this.friction = 0.85; this.spring = 0.12;
+      this.alpha = 1.0; this.targetAlpha = 1.0;
+    }
+    update(deconstructActive) {
+      let targetX = this.ox, targetY = this.oy;
+      this.targetAlpha = 1.0;
+      if (deconstructActive) {
+        if (this.type === 'neg-boy') {
+          targetX = this.ox + 330 * (canvasWidth / 900);
+        } else if (this.type === 'I') {
+          this.targetAlpha = 0.15;
+        }
+      }
+      const dx = this.x - mouse.x, dy = this.y - mouse.y;
+      const dist = Math.sqrt(dx*dx + dy*dy);
+      let fx = 0, fy = 0;
+      if (dist < mouse.radius) {
+        const force = (mouse.radius - dist) / mouse.radius;
+        const angle = Math.atan2(dy, dx);
+        fx = Math.cos(angle) * force * 16;
+        fy = Math.sin(angle) * force * 16;
+      }
+      const ax = (targetX - this.x) * this.spring;
+      const ay = (targetY - this.y) * this.spring;
+      this.vx = (this.vx + ax + fx) * this.friction;
+      this.vy = (this.vy + ay + fy) * this.friction;
+      this.x += this.vx; this.y += this.vy;
+      this.alpha += (this.targetAlpha - this.alpha) * 0.1;
+    }
+    draw(renderCtx) {
+      let color;
+      if (this.type === 'neg-boy' && settings.deconstruct) {
+        // Warm amber accent when deconstructed (matches site palette)
+        color = `rgba(90, 80, 60, ${this.alpha * 0.9})`;
+      } else {
+        // Steel-sepia gradient: site's dark text tone with subtle warmth
+        const val = Math.floor(30 + Math.sin(this.ox * 0.012) * 18);
+        const r = val + 2, g = val, b = val - 6;
+        color = `rgba(${r}, ${g}, ${b}, ${this.alpha})`;
+      }
+      renderCtx.fillStyle = color;
+      const s = this.size * 0.78;
+      const x = Math.round(this.x - s/2), y = Math.round(this.y - s/2);
+      const radius = Math.max(1, s * 0.28);
+      if (radius > 1.5) {
+        renderCtx.beginPath();
+        renderCtx.roundRect(x, y, Math.ceil(s), Math.ceil(s), radius);
+        renderCtx.fill();
+      } else {
+        renderCtx.fillRect(x, y, Math.ceil(s), Math.ceil(s));
       }
     }
   }
 
-  gsap.ticker.add(() => drawFrame(performance.now()));
-  drawFrame(0);
+  function buildPixelGrid() {
+    const cols = settings.cols, rows = settings.rows;
+    offscreen.width = cols; offscreen.height = rows;
+    offCtx.clearRect(0, 0, cols, rows);
+    offCtx.save();
+    offCtx.scale(cols / 900, rows / 650);
+    const boyPath = new Path2D("M 45,540 C 42,530 40,510 41,490 C 42,460 46,430 48,400 C 50,370 50,340 48,310 C 46,280 41,250 36,220 C 34,210 31,190 32,175 C 33,160 40,150 43,130 C 44,120 41,110 36,100 C 31,90 27,75 29,60 C 31,42 45,25 62,20 C 80,15 96,28 100,45 C 102,55 98,65 101,75 C 104,85 114,92 118,100 C 122,108 118,115 112,120 C 108,123 110,128 113,132 C 116,136 122,140 118,148 C 115,152 108,153 105,158 C 102,163 103,169 101,175 C 98,181 92,188 90,198 C 88,208 89,228 88,248 C 87,278 91,308 93,338 C 95,368 96,398 95,428 C 94,458 91,488 89,518 C 88,530 92,535 100,538 C 108,541 115,541 118,543 C 120,545 115,545 45,540 Z");
+    // A body
+    offCtx.fillStyle = '#FF0000';
+    offCtx.beginPath();
+    offCtx.moveTo(100,650); offCtx.lineTo(250,80); offCtx.lineTo(350,80);
+    offCtx.lineTo(500,650); offCtx.lineTo(400,650); offCtx.lineTo(350,470);
+    offCtx.lineTo(215,470); offCtx.lineTo(160,650);
+    offCtx.closePath(); offCtx.fill();
+    // Cut out boy silhouette + inner triangle
+    offCtx.globalCompositeOperation = 'destination-out';
+    offCtx.save(); offCtx.translate(250,100); offCtx.fill(boyPath); offCtx.restore();
+    offCtx.beginPath();
+    offCtx.moveTo(175,650); offCtx.lineTo(245,470); offCtx.lineTo(290,650);
+    offCtx.closePath(); offCtx.fill();
+    offCtx.globalCompositeOperation = 'source-over';
+    // Negative-space boy (green channel)
+    offCtx.fillStyle = '#00FF00';
+    offCtx.save(); offCtx.translate(250,100); offCtx.fill(boyPath); offCtx.restore();
+    // I character (blue channel)
+    offCtx.fillStyle = '#0000FF';
+    offCtx.save(); offCtx.translate(580,100); offCtx.fill(boyPath); offCtx.restore();
+    // Dots
+    offCtx.fillStyle = '#FFFF00';
+    offCtx.beginPath(); offCtx.arc(545,625,23,0,Math.PI*2); offCtx.fill();
+    offCtx.beginPath(); offCtx.arc(810,625,23,0,Math.PI*2); offCtx.fill();
+    offCtx.restore();
 
-  // GSAP entrance: scale in from 0 with stagger already handled by drawFrame reveal
-  gsap.from(canvas, {
-    scale: 0, duration: 0.8, ease: 'back.out(1.2)',
-    delay: 0.2
+    const imgData = offCtx.getImageData(0,0,cols,rows);
+    const data = imgData.data;
+    particles = [];
+    pSize = canvasWidth / cols;
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        const idx = (r * cols + c) * 4;
+        const R = data[idx], G = data[idx+1], B = data[idx+2], A = data[idx+3];
+        if (A > 120) {
+          let type = null;
+          if (R > 200 && G < 50 && B < 50) type = 'A';
+          else if (G > 200 && R < 50 && B < 50) type = 'neg-boy';
+          else if (B > 200 && R < 50 && G < 50) type = 'I';
+          else if (R > 200 && G > 200 && B < 50) type = 'dots';
+          if (type) {
+            const px = c * pSize + pSize/2, py = r * pSize + pSize/2;
+            particles.push(new PixelParticle(c, r, px, py, pSize, type));
+          }
+        }
+      }
+    }
+  }
+
+  function animate() {
+    ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+    // Subtle grid — beige palette
+    ctx.save();
+    ctx.strokeStyle = 'rgba(180,170,155,0.18)';
+    ctx.lineWidth = 0.5;
+    for (let x = 0; x < canvasWidth; x += pSize) {
+      ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,canvasHeight); ctx.stroke();
+    }
+    for (let y = 0; y < canvasHeight; y += pSize) {
+      ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(canvasWidth,y); ctx.stroke();
+    }
+    ctx.restore();
+    for (let i = 0; i < particles.length; i++) {
+      const p = particles[i];
+      p.update(settings.deconstruct);
+      if (p.type === 'neg-boy' && !settings.deconstruct) continue;
+      p.draw(ctx);
+    }
+    requestAnimationFrame(animate);
+  }
+
+  function resizeCanvas() {
+    const rect = canvas.getBoundingClientRect();
+    canvasWidth = rect.width || canvas.offsetWidth;
+    canvasHeight = Math.round(canvasWidth * (650 / 900));
+    canvas.width = canvasWidth;
+    canvas.height = canvasHeight;
+    buildPixelGrid();
+  }
+
+  window.toggleDeconstruct = function() {
+    settings.deconstruct = !settings.deconstruct;
+    document.getElementById('ai-btn-text').textContent =
+      settings.deconstruct ? 'ASSEMBLE()' : 'DECONSTRUCT()';
+  };
+  window.triggerAssembleEffect = function() {
+    particles.forEach(p => {
+      p.x = p.ox + (Math.random()-0.5) * canvasWidth;
+      p.y = p.oy + (Math.random()-0.5) * canvasHeight;
+    });
+  };
+
+  canvas.addEventListener('mousemove', e => {
+    const rect = canvas.getBoundingClientRect();
+    mouse.x = e.clientX - rect.left;
+    mouse.y = e.clientY - rect.top;
+  });
+  canvas.addEventListener('mouseleave', () => { mouse.x = -9999; mouse.y = -9999; });
+  canvas.addEventListener('touchmove', e => {
+    if (e.touches.length > 0) {
+      const rect = canvas.getBoundingClientRect();
+      mouse.x = e.touches[0].clientX - rect.left;
+      mouse.y = e.touches[0].clientY - rect.top;
+    }
+  });
+  canvas.addEventListener('touchend', () => { mouse.x = -9999; mouse.y = -9999; });
+  window.addEventListener('resize', resizeCanvas);
+
+  window.addEventListener('load', () => {
+    resizeCanvas();
+    animate();
   });
 })();
 
@@ -583,9 +718,11 @@ document.querySelectorAll('.port-canvas').forEach(c => {
 // Hero entrance sequence
 window.addEventListener('load', () => {
   const tl = gsap.timeline();
-  tl.from('#hero-name', { opacity: 0, y: 30, duration: 0.8, ease: 'power3.out' }, 0.8)
+  tl.from('.ai-particle-wrap', { opacity: 0, scale: 0.96, duration: 1.0, ease: 'power3.out' }, 0.3)
+    .from('#hero-name', { opacity: 0, y: 30, duration: 0.8, ease: 'power3.out' }, 0.6)
     .from('#hero-subtitle', { opacity: 0, y: 20, duration: 0.8, ease: 'power3.out' }, '-=0.4')
-    .from('#hero-cta', { opacity: 0, scale: 0.9, duration: 0.5, ease: 'back.out(1.5)' }, '-=0.4');
+    .from('#hero-cta', { opacity: 0, scale: 0.9, duration: 0.5, ease: 'back.out(1.5)' }, '-=0.4')
+    .from('.ai-particle-controls', { opacity: 0, y: 8, duration: 0.4, ease: 'power2.out' }, '-=0.3');
 });
 
 // Section content reveals
