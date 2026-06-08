@@ -51,13 +51,11 @@
     font-size: 1.15rem;
   }
 
-  /* ── Grid overlay ── */
-  .grid-bg {
-    position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: 0.06;
-    background-image:
-      linear-gradient(rgba(0,0,0,0.15) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(0,0,0,0.15) 1px, transparent 1px);
-    background-size: 20px 20px;
+  /* ── Matrix rain canvas ── */
+  #matrix-bg {
+    position: fixed; inset: 0; z-index: 0;
+    pointer-events: none;
+    width: 100%; height: 100%;
   }
 
   /* ── Typography ── */
@@ -254,7 +252,7 @@
 </head>
 <body>
 
-<div class="grid-bg"></div>
+<canvas id="matrix-bg"></canvas>
 <div class="scanlines"></div>
 
 <!-- Navigation -->
@@ -424,6 +422,101 @@ gsap.registerPlugin(ScrollTrigger);
   let particles = [], canvasWidth = 0, canvasHeight = 0, pSize = 10;
   const mouse = { x: -9999, y: -9999, radius: settings.forceRadius };
 
+  // ── BLIMP autopilot ──────────────────────────────────────────────
+  // The blimp wanders the canvas using layered slow sine waves (cheap
+  // smooth noise). It feeds its centre position into `mouse` so particles
+  // react identically to the real cursor. Real mouse takes over whenever
+  // the user moves inside the canvas.
+  let userMouseActive = false;
+  let userMouseTimeout = null;
+
+  const blimp = {
+    x: 0, y: 0,          // current draw position (smooth lerp target)
+    dx: 0, dy: 0,        // display position (lerped toward x/y)
+    t: Math.random() * 1000, // phase offset so it doesn't always start at centre
+    speedMult: 1,
+    // Compute target position from layered sine curves
+    target(W, H) {
+      const t = this.t;
+      const cx = W * 0.5, cy = H * 0.5;
+      const rx = W * 0.38, ry = H * 0.32;
+      // Primary orbit
+      const tx = cx + rx * Math.sin(t * 0.00028)
+                     + rx * 0.35 * Math.sin(t * 0.00071 + 1.3)
+                     + rx * 0.15 * Math.cos(t * 0.00130 + 0.7);
+      const ty = cy + ry * Math.cos(t * 0.00034)
+                     + ry * 0.40 * Math.cos(t * 0.00059 + 2.1)
+                     + ry * 0.18 * Math.sin(t * 0.00110 + 1.9);
+      return { tx, ty };
+    }
+  };
+
+  // Pixel-art blimp draw function — drawn directly on the main ctx
+  function drawBlimp(renderCtx, bx, by, heading) {
+    // heading: -1 = left, +1 = right (based on movement direction)
+    const W = 52, H = 28; // blimp canvas size in px
+    renderCtx.save();
+    renderCtx.translate(Math.round(bx), Math.round(by));
+    if (heading < 0) renderCtx.scale(-1, 1); // flip when going left
+
+    const c = renderCtx;
+    const on  = (x, y, w, h, col) => { c.fillStyle = col; c.fillRect(x, y, w, h); };
+
+    // shadow / exhaust puff
+    c.globalAlpha = 0.10;
+    c.fillStyle = '#1a1714';
+    c.beginPath(); c.ellipse(2, 14, 18, 5, 0, 0, Math.PI*2); c.fill();
+    c.globalAlpha = 1;
+
+    // envelope (body) — warm sepia to match palette
+    on(-20, -10, 40,  4, '#5c5650'); // top strip
+    on(-22,  -6, 44,  4, '#7a7268');
+    on(-24,  -2, 48,  6, '#8a8278'); // widest belt
+    on(-22,   4, 44,  4, '#7a7268');
+    on(-18,   8, 36,  4, '#5c5650'); // taper bottom
+    on(-12,  12, 24,  2, '#3a3530'); // tip bottom
+
+    // highlight stripe
+    on(-14,  -8, 28,  2, '#b0a898');
+    on(-18,  -6, 36,  2, '#c8bfb4');
+    on(-18,  -4, 10,  2, '#d4cbc0');
+
+    // nose cone
+    on(-24,  -2,  4,  6, '#3a3530');
+    on( 20,  -2,  4,  6, '#3a3530');
+
+    // gondola (cabin)
+    on( -8,  10, 16,  8, '#1a1714');
+    on( -6,  12, 12,  4, '#2e2a28');
+    // porthole
+    on( -2,  13,  4,  3, '#9c9488');
+    on( -1,  14,  2,  1, '#f5f0e8');
+
+    // tail fins
+    on( 14,  -8,  6, 10, '#3a3530');
+    on( 18,  -6,  4,  8, '#5c5650');
+    on( 14,   4,  8,  6, '#3a3530');
+    on( 18,   6,  6,  4, '#5c5650');
+
+    // propeller (simple 2-blade pixel)
+    const propAngle = (Date.now() * 0.008) % (Math.PI * 2);
+    c.save();
+    c.translate(16, 6);
+    c.rotate(propAngle);
+    on(-1, -5, 2, 10, '#1a1714');
+    on(-5, -1, 10, 2, '#1a1714');
+    c.restore();
+
+    // mooring rope (dangling below)
+    c.strokeStyle = '#9c9488';
+    c.lineWidth = 1;
+    c.setLineDash([2, 2]);
+    c.beginPath(); c.moveTo(0, 18); c.lineTo(0, 28); c.stroke();
+    c.setLineDash([]);
+
+    renderCtx.restore();
+  }
+
   class PixelParticle {
     constructor(c, r, targetX, targetY, size, type) {
       this.col = c; this.row = r;
@@ -555,12 +648,39 @@ gsap.registerPlugin(ScrollTrigger);
       ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(canvasWidth,y); ctx.stroke();
     }
     ctx.restore();
+
+    // ── Tick blimp ──
+    blimp.t += 16; // ~60fps increment in ms-equivalent units
+    const { tx, ty } = blimp.target(canvasWidth, canvasHeight);
+    // Smooth lerp toward computed target
+    blimp.x += (tx - blimp.x) * 0.018;
+    blimp.y += (ty - blimp.y) * 0.018;
+    // Lerp display pos (extra smoothness for drawing)
+    blimp.dx += (blimp.x - blimp.dx) * 0.12;
+    blimp.dy += (blimp.y - blimp.dy) * 0.12;
+    // Determine heading from velocity
+    const blimpVx = blimp.x - blimp.dx;
+    const heading = blimpVx >= 0 ? 1 : -1;
+
+    // Feed blimp into mouse when user isn't actively hovering
+    if (!userMouseActive) {
+      mouse.x = blimp.dx;
+      mouse.y = blimp.dy;
+    }
+
+    // Update & draw particles
     for (let i = 0; i < particles.length; i++) {
       const p = particles[i];
       p.update(settings.deconstruct);
       if (p.type === 'neg-boy' && !settings.deconstruct) continue;
       p.draw(ctx);
     }
+
+    // Draw blimp on top (only when autopilot active for clarity)
+    if (!userMouseActive) {
+      drawBlimp(ctx, blimp.dx, blimp.dy, heading);
+    }
+
     requestAnimationFrame(animate);
   }
 
@@ -589,20 +709,41 @@ gsap.registerPlugin(ScrollTrigger);
     const rect = canvas.getBoundingClientRect();
     mouse.x = e.clientX - rect.left;
     mouse.y = e.clientY - rect.top;
+    userMouseActive = true;
+    clearTimeout(userMouseTimeout);
+    // Resume blimp 2s after last mouse movement
+    userMouseTimeout = setTimeout(() => { userMouseActive = false; }, 2000);
   });
-  canvas.addEventListener('mouseleave', () => { mouse.x = -9999; mouse.y = -9999; });
+  canvas.addEventListener('mouseleave', () => {
+    clearTimeout(userMouseTimeout);
+    userMouseTimeout = setTimeout(() => {
+      mouse.x = -9999; mouse.y = -9999;
+      userMouseActive = false;
+    }, 400);
+  });
   canvas.addEventListener('touchmove', e => {
     if (e.touches.length > 0) {
       const rect = canvas.getBoundingClientRect();
       mouse.x = e.touches[0].clientX - rect.left;
       mouse.y = e.touches[0].clientY - rect.top;
+      userMouseActive = true;
+      clearTimeout(userMouseTimeout);
+      userMouseTimeout = setTimeout(() => { userMouseActive = false; }, 2000);
     }
   });
-  canvas.addEventListener('touchend', () => { mouse.x = -9999; mouse.y = -9999; });
+  canvas.addEventListener('touchend', () => {
+    clearTimeout(userMouseTimeout);
+    userMouseTimeout = setTimeout(() => { userMouseActive = false; }, 600);
+  });
   window.addEventListener('resize', resizeCanvas);
 
   window.addEventListener('load', () => {
     resizeCanvas();
+    // Seed blimp at a natural starting position so it doesn't teleport from corner
+    blimp.x = canvasWidth * 0.5;
+    blimp.y = canvasHeight * 0.35;
+    blimp.dx = blimp.x;
+    blimp.dy = blimp.y;
     animate();
   });
 })();
@@ -712,8 +853,135 @@ document.querySelectorAll('.port-canvas').forEach(c => {
 });
 
 // ══════════════════════════════════════════
-// GSAP SCROLL ANIMATIONS
+// MATRIX RAIN BACKGROUND
 // ══════════════════════════════════════════
+(function() {
+  const canvas = document.getElementById('matrix-bg');
+  const ctx = canvas.getContext('2d');
+
+  // Character pool — katakana + digits + symbols (Matrix original vibe)
+  const CHARS = 'アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン' +
+                '0123456789' +
+                'ABCDEFGHIJKLMNOPQRSTUVWXYZ' +
+                '+-*/=<>[]{}|@#$%&';
+
+  const FONT_SIZE   = 26;   // wider spacing = fewer columns = sparser look
+  const SPEED_MIN   = 0.06;
+  const SPEED_MAX   = 0.11;
+  const TRAIL_LEN   = 10;   // shorter trail
+  const FPS_TARGET  = 24;
+  const BG_COLOR    = '#f5f0e8';
+
+  const HEAD_COLOR  = 'rgba(60, 50, 38, 0.38)';
+  const BODY_COLOR  = (alpha) => `rgba(92, 86, 80, ${alpha})`;
+  const TAIL_COLOR  = (alpha) => `rgba(156, 148, 136, ${alpha})`;
+
+  let cols = 0;
+  let streams = [];
+
+  function randomChar() {
+    return CHARS[Math.floor(Math.random() * CHARS.length)];
+  }
+
+  function initStream(colIndex) {
+    return {
+      col: colIndex,
+      // y position in fractional cells — start above viewport so streams
+      // enter from the top at staggered times
+      y: -(Math.random() * TRAIL_LEN * 3 + TRAIL_LEN),
+      speed: SPEED_MIN + Math.random() * (SPEED_MAX - SPEED_MIN),
+      // Each cell in the trail: [char, ageRatio 0-1]
+      trail: Array.from({ length: TRAIL_LEN }, () => ({
+        ch: randomChar(),
+        // Glitch: head char refreshes ~every 8 frames, rest slower
+        nextFlip: Math.floor(Math.random() * 20)
+      })),
+      frameCount: 0,
+    };
+  }
+
+  function resize() {
+    canvas.width  = window.innerWidth;
+    canvas.height = window.innerHeight;
+    const newCols = Math.floor(canvas.width / FONT_SIZE);
+    if (newCols === cols) return;
+    cols = newCols;
+    // Only spawn a stream for ~every 7th column so it feels very sparse
+    streams = Array.from({ length: cols }, (_, i) =>
+      Math.random() < 0.15 ? initStream(i) : null
+    ).filter(Boolean);
+  }
+
+  let lastTime = 0;
+  const frameInterval = 1000 / FPS_TARGET;
+
+  function draw(timestamp) {
+    requestAnimationFrame(draw);
+    const delta = timestamp - lastTime;
+    if (delta < frameInterval) return;
+    lastTime = timestamp - (delta % frameInterval);
+
+    // Soft clear — paint a semi-transparent bg rect to create fade trail
+    ctx.fillStyle = 'rgba(245, 240, 232, 0.28)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    ctx.font = `${FONT_SIZE}px "VT323", monospace`;
+    ctx.textBaseline = 'top';
+
+    for (const s of streams) {
+      s.y += s.speed;
+      s.frameCount++;
+
+      // Randomly mutate characters in the trail
+      for (let i = 0; i < s.trail.length; i++) {
+        s.trail[i].nextFlip--;
+        if (s.trail[i].nextFlip <= 0) {
+          s.trail[i].ch = randomChar();
+          // Head flips fast, tail slow
+          s.trail[i].nextFlip = i === 0
+            ? 6 + Math.floor(Math.random() * 8)
+            : 30 + Math.floor(Math.random() * 40);
+        }
+      }
+
+      const x = s.col * FONT_SIZE;
+
+      for (let i = 0; i < s.trail.length; i++) {
+        const cellY = (s.y - i) * FONT_SIZE;
+        if (cellY < -FONT_SIZE || cellY > canvas.height) continue;
+
+        const ratio = 1 - i / s.trail.length; // 1 at head, 0 at tail
+
+        if (i === 0) {
+          // Head — brightest, slightly larger feel
+          ctx.fillStyle = HEAD_COLOR;
+        } else if (ratio > 0.5) {
+          // Upper body
+          ctx.fillStyle = BODY_COLOR((ratio - 0.5) * 2 * 0.28);
+        } else {
+          // Tail — very faint
+          ctx.fillStyle = TAIL_COLOR(ratio * 0.16);
+        }
+
+        ctx.fillText(s.trail[i].ch, x, cellY);
+      }
+
+      // Reset stream when it has fully passed off the bottom
+      if ((s.y - s.trail.length) * FONT_SIZE > canvas.height) {
+        // Recycle with fresh random delay above viewport
+        s.y = -(Math.random() * TRAIL_LEN * 4 + TRAIL_LEN);
+        s.speed = SPEED_MIN + Math.random() * (SPEED_MAX - SPEED_MIN);
+        s.trail.forEach(c => { c.ch = randomChar(); c.nextFlip = Math.floor(Math.random() * 20); });
+      }
+    }
+  }
+
+  window.addEventListener('resize', resize);
+  resize();
+  requestAnimationFrame(draw);
+})();
+
+
 
 // Hero entrance sequence
 window.addEventListener('load', () => {
